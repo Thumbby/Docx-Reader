@@ -23,10 +23,11 @@ def get_response(user_input: str, messages: list = []):
 
 if __name__ == "__main__":
     # initialize the memory
-    messages = [{
-        'role':'system',
-        'content': '你是一个仿生人,可以模仿人类的情感并且表达在回答中,请根据回答的内容选择适合的语气进行'
-    }]
+    '''messages = [{
+        'role':'system', 
+        'content': '你是一个仿生人,可以模仿人类的情感并且表达在回答中,请根据回答的内容选择适合的语气进行回复'
+    }]'''
+    messages = []
     while True:
         user_input = input("请输入对话:")
         get_response(user_input, messages=messages)
