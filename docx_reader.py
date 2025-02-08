@@ -1,16 +1,20 @@
 import streamlit as st
-from langchain.document_loaders import Docx2txtLoader
+from langchain_community.document_loaders import Docx2txtLoader
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_text_splitters import CharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain.chains.combine_documents import create_stuff_documents_chain, create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
+import os
+import torch
+
+torch.classes.__path__ = [os.path.join(torch.__path__[0], torch.classes.__file__)] 
 
 def main():
     # App title
@@ -58,7 +62,7 @@ def main():
         retriever = vector.as_retriever(search_type="similarity", search_kwargs={"k": 3})
                 
         # Define the LLM and the prompt
-        llm = Ollama(model="deepseek-r1:8b")
+        llm = OllamaLLM(model="deepseek-r1:8b")
         prompt = """
         1. 参考下列内容并在最后回答问题.
         2. 如果你不知道答案,请回答文档中未提及,请不要自己编造答案.
@@ -106,6 +110,7 @@ def main():
                 combine_docs_chain = combine_documents_chain
             )
             response = retrieval_chain.invoke({"input": prompt})
+            print(response)
             
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": prompt})
