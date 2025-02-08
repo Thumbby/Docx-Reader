@@ -3,13 +3,14 @@ from langchain.document_loaders import Docx2txtLoader
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain_experimental.text_splitter import SemanticChunker
+from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
-from langchain.chains.llm import LLMChain
-from langchain.chains.combine_documents.stuff import StuffDocumentsChain
-from langchain.chains import RetrievalQA
+from langchain_core.output_parsers import StrOutputParser
+from langchain.chains.combine_documents import create_stuff_documents_chain, create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
 
 def main():
     # App title
@@ -28,7 +29,7 @@ def main():
         st.markdown("""
         - **Embedding Model**: HuggingFace
         - **Retriever Type**: Similarity Search
-        - **LLM**: DeepSeek R1 1.5b(Ollama)
+        - **LLM**: DeepSeek R1 8b(Ollama)
         """)
 
     # Main file uploader section
@@ -46,36 +47,39 @@ def main():
 
         # Split the document into chunks
         text_splitter = SemanticChunker(HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"))
+        # text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=30, separator="\n")
         documents = text_splitter.split_documents(docs)
-        
+                
         # Instantiate the embedding model
         embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         # Create vector store and retriever
         vector = FAISS.from_documents(documents, embedder)
-        
+        retriever = vector.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+                
         # Define the LLM and the prompt
         llm = Ollama(model="deepseek-r1:8b")
         prompt = """
         1. 参考下列内容并在最后回答问题.
         2. 如果你不知道答案,请回答文档中未提及,请不要自己编造答案.
         3. 尽可能以下列内容中原文来回答问题
+        4. 请在回答中舍弃文档内容来源和无关信息,例如source:temp.docx
         内容: {context}
-        问题: {question}
+        问题: {input}
         回答:"""
         QA_CHAIN_PROMPT = PromptTemplate.from_template(prompt)
 
         # Define the document and combination chains
-        llm_chain = LLMChain(llm=llm, prompt=QA_CHAIN_PROMPT, verbose=True)
+        llm_chain = QA_CHAIN_PROMPT | llm | StrOutputParser()
         document_prompt = PromptTemplate(
             input_variables=["page_content", "source"],
             template="Context:\ncontent:{page_content}\nsource:{source}",
         )
-        combine_documents_chain = StuffDocumentsChain(
-            llm_chain=llm_chain,
+        combine_documents_chain = create_stuff_documents_chain(
+            llm=llm,
+            prompt= QA_CHAIN_PROMPT,
             document_variable_name="context",
             document_prompt=document_prompt,
-            verbose=True
         )
         
         # Question input and response display
@@ -84,7 +88,7 @@ def main():
         # Initialize chat history
         if "messages" not in st.session_state:
             st.session_state.messages = []
-            
+
          
         # Display chat messages from history on app rerun
         for message in st.session_state.messages:
@@ -97,21 +101,17 @@ def main():
             with st.chat_message("user"):
                 st.markdown(prompt)
                 
-            retriever = vector.as_retriever(search_type="similarity", search_kwargs={"k": 1})    
-            retriever.invoke(prompt)
-            qa = RetrievalQA(
-                combine_documents_chain=combine_documents_chain,
-                retriever=retriever,
-                verbose=True,
-                return_source_documents=True
+            retrieval_chain = create_retrieval_chain(
+                retriever = retriever,
+                combine_docs_chain = combine_documents_chain
             )
+            response = retrieval_chain.invoke({"input": prompt})
             
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": prompt})
             # Display assistant response in chat message container
-            response = qa(prompt)["result"]
             with st.chat_message("assistant"):
-                st.markdown(response)
+                st.markdown(response['answer'])
             st.session_state.messages.append({"role": "assistant", "content": response})
                                 
     else:
