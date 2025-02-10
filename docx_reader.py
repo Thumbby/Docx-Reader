@@ -67,7 +67,6 @@ def main():
         1. 参考下列内容并在最后回答问题.
         2. 如果你不知道答案,请回答文档中未提及,请不要自己编造答案.
         3. 尽可能以下列内容中原文来回答问题
-        4. 请在回答中舍弃文档内容来源和无关信息,例如source:temp.docx
         内容: {context}
         问题: {input}
         回答:"""
@@ -110,14 +109,13 @@ def main():
                 combine_docs_chain = combine_documents_chain
             )
             response = retrieval_chain.invoke({"input": prompt})
-            print(response)
             
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": prompt})
             # Display assistant response in chat message container
             with st.chat_message("assistant"):
                 st.markdown(response['answer'])
-            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.session_state.messages.append({"role": "assistant", "content": response['answer']})
                                 
     else:
         st.info("请先上传文件")
