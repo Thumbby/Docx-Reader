@@ -50,8 +50,8 @@ def main():
         docs = loader.load()
 
         # Split the document into chunks
-        text_splitter = SemanticChunker(HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"))
-        # text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=30, separator="\n")
+        # text_splitter = SemanticChunker(HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"))
+        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=30, separator="\n")
         documents = text_splitter.split_documents(docs)
                 
         # Instantiate the embedding model
