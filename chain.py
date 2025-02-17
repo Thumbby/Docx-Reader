@@ -19,7 +19,7 @@ def chain_init(documents:List[Document]):
 
     # Create vector store and retriever
     vector = FAISS.from_documents(documents, embedder)
-    retriever = vector.as_retriever(search_type="similarity", search_kwargs={"k": 1})
+    retriever = vector.as_retriever(search_type="similarity", search_kwargs={"k": 3})
             
     # Define the LLM and the prompt
     llm = OllamaLLM(
