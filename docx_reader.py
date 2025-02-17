@@ -13,7 +13,7 @@ torch.classes.__path__ = [os.path.join(torch.__path__[0], torch.classes.__file__
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" 
 
 # set_debug(True)
-def main():
+def app():
     # App title
     st.title("📄 需求文档分析")
 
@@ -49,7 +49,11 @@ def main():
         documents = text_splitter.split_documents(docs)    
         
         # Initialize chain
-        retrieval_chain = chain_init(documents=documents)    
+        if "chain" not in st.session_state:
+            retrieval_chain = chain_init(documents=documents)
+            st.session_state.chain = retrieval_chain
+        else:
+            retrieval_chain = st.session_state.chain        
 
         # Question input and response display
         st.header("❓ 开始询问与文档相关的问题")
@@ -63,24 +67,26 @@ def main():
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
+                
+        last_message = st.session_state.messages[-1]
         
-        # React to user input
-        if prompt := st.chat_input("请输入您的问题:"):
-            # Display user message in chat message container
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            # Add user message to chat history
-            st.session_state.messages.append({"role": "user", "content": prompt})    
-                            
-            response = retrieval_chain.invoke({"input": prompt})
-            
-            # Display assistant response in chat message container
-            with st.chat_message("assistant"):
-                st.markdown(response['answer'])
-            st.session_state.messages.append({"role": "assistant", "content": response['answer']})
-                                
+        if last_message["role"] == "assistant":
+            # React to user input
+            if prompt := st.chat_input("请输入您的问题:"):
+                # Display user message in chat message container
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+                # Add user message to chat history
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                with st.spinner("思考中。。。"):    
+                    response = retrieval_chain.invoke({"input": prompt})                        
+                    # Display assistant response in chat message container
+                    with st.chat_message("assistant"):
+                        st.markdown(response['answer'])
+                    st.session_state.messages.append({"role": "assistant", "content": response['answer']})
+                                    
     else:
         st.info("请先上传文件")
     
 if __name__ == "__main__":
-    main()
+    app()
