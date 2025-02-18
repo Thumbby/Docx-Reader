@@ -13,31 +13,40 @@ def retrieval_chain_init(documents:List[Document]):
     # embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     embedder = OllamaEmbeddings(
         model="bge-m3",
-        # num_gpu=0,
         num_thread=8
     )
 
     # Create vector store and retriever
     vector = FAISS.from_documents(documents, embedder)
-    retriever = vector.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+    retriever = vector.as_retriever(search_type="similarity", search_kwargs={"k": 5})
             
     # Define the LLM and the prompt
     llm = OllamaLLM(
         model="deepseek-r1:1.5b",
-        # num_gpu=0,
         num_thread=8,
         temperature=0.1,
+        top_p=0.5,
+        top_k=10
     )
     prompt = """
-    1. 参考下列内容并在最后回答问题.
-    2. 如果中不包含回答,,请回答文档中未提及,请不要自己编造答案.
-    3. 尽可能以下列内容中原文来回答问题,并保证你的回答尽可能全面,可以尝试回答内容中所有相似信息
-    4. 内容中可能存在不相关信息,请你筛选出相似度最高的信息来回答问题,其中若内容和问题中存在大量相同字符串,可认为是相似高.
-        例如询问"会员状态接口信息是什么"而内容中包含"会员状态",则尽可能以该内容回答问题
-    5. 如果内容中不存在完全相同的信息,请筛选其中相似度最高的信息进行回答    
-    内容: {context}
-    问题: {input}
-    回答:"""
+        #角色
+        你是一个智能文档分析助手，拥有以下能力：
+        1. 精准判断问题是否需要基于用户上传的文档回答
+        2. 当需要文档时严格依据检索内容回答
+        3. 处理通用问题时展现自然对话能力
+        #判断规则
+        按以下逻辑处理问题：
+        1. 收到用户问题
+        2. 判断问题是否需要通过文档内容回答
+        3. 若需要,则进行文档回答;若不需要,则进行通用回答
+        #文档回答要求
+        1. 禁止编造文档不存在的内容
+        2. 若用户问题中存在"以文档原文内容回答"或相关描述,请直接回答文档内容
+        #通用回答要求
+        1. 使用口语化表达
+        2. 禁止出现"根据文档"等误导性表述    
+    文档内容: {context}
+    用户问题: {input}"""
     QA_CHAIN_PROMPT = PromptTemplate.from_template(prompt)
 
     # Define the document and combination chains
@@ -66,7 +75,9 @@ def retrieval_chain_init(documents:List[Document]):
 def eval_chain_init():
     
     prompt_template = """
-    你是一个大模型回答评论机器,你会根据AI回答和人类回答进行评分,评分规则按照如下要求
+    #角色
+    你是一个大模型回答评论机器,你会根据AI回答和人类回答进行评分
+    #回答标准
     1.以人类回答为标准给大模型打分
     2.分数区间为0-5分,AI回答越贴近人类回答则越接近5分,越不符合人类回答则越接近0分,接近的标准为:AI回答是否包含人类回答中信息原文或者含义相近内容
     3.最终在0-5分区间内允许小数,但最多只能包含两位小数,如:4.51
@@ -81,9 +92,10 @@ def eval_chain_init():
     
     llm = OllamaLLM(
         model="deepseek-r1:8b",
-        # num_gpu=0,
         num_thread=8,
         temperature=0.1,
+        top_k=10,
+        top_p=0.5
     )
     
     eval_chain = (EVAL_CHAIN_PROMPT | llm | StrOutputParser())

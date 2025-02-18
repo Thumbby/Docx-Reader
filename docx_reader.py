@@ -11,7 +11,7 @@ import torch
 torch.classes.__path__ = [os.path.join(torch.__path__[0], torch.classes.__file__)]
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" 
 
-set_debug(True)
+# set_debug(True)
 def app():
     # App title
     st.title("📄 需求文档分析")
@@ -44,7 +44,7 @@ def app():
             
         loader = Docx2txtLoader('temp.docx')
         docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=4096, chunk_overlap=256)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=20)
         documents = text_splitter.split_documents(docs)    
         
         # Initialize chain
