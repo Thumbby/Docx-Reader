@@ -8,7 +8,7 @@ from typing import List
 import streamlit as st
 from langchain_core.output_parsers import StrOutputParser
 
-def chain_init(documents:List[Document]):
+def retrieval_chain_init(documents:List[Document]):
     # Instantiate the embedding model
     # embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     embedder = OllamaEmbeddings(
@@ -62,3 +62,31 @@ def chain_init(documents:List[Document]):
     )
                 
     return retrieval_chain
+
+def eval_chain_init():
+    
+    prompt_template = """
+    你是一个大模型回答评论机器,你会根据AI回答和人类回答进行评分,评分规则按照如下要求
+    1.以人类回答为标准给大模型打分
+    2.分数区间为0-5分,AI回答越贴近人类回答则越接近5分,越不符合人类回答则越接近0分,接近的标准为:AI回答是否包含人类回答中信息原文或者含义相近内容
+    3.最终在0-5分区间内允许小数,但最多只能包含两位小数,如:4.51
+    4.你的回答只需要包含一个数字即可,**不允许**包含除了分数以外的任何内容
+    AI回答:{ai_response}
+    人类回答:{human_response}
+    """
+    EVAL_CHAIN_PROMPT = PromptTemplate(
+        input_variables=["ai_response", "human_response"],
+        template = prompt_template
+    )
+    
+    llm = OllamaLLM(
+        model="deepseek-r1:8b",
+        # num_gpu=0,
+        num_thread=8,
+        temperature=0.1,
+    )
+    
+    eval_chain = (EVAL_CHAIN_PROMPT | llm | StrOutputParser())
+    
+    return eval_chain
+    

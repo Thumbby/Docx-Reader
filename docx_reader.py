@@ -3,16 +3,15 @@ from langchain_community.document_loaders import Docx2txtLoader, DirectoryLoader
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain.globals import set_verbose, set_debug
-from chain import chain_init
-import re
+from chain import retrieval_chain_init, eval_chain_init
+from util import remove_think_chain
 import os
 import torch
-
 
 torch.classes.__path__ = [os.path.join(torch.__path__[0], torch.classes.__file__)]
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" 
 
-# set_debug(True)
+set_debug(True)
 def app():
     # App title
     st.title("📄 需求文档分析")
@@ -49,11 +48,17 @@ def app():
         documents = text_splitter.split_documents(docs)    
         
         # Initialize chain
-        if "chain" not in st.session_state:
-            retrieval_chain = chain_init(documents=documents)
-            st.session_state.chain = retrieval_chain
+        if "retrieval_chain" not in st.session_state:
+            retrieval_chain = retrieval_chain_init(documents=documents)
+            st.session_state.retrieval_chain = retrieval_chain
         else:
-            retrieval_chain = st.session_state.chain        
+            retrieval_chain = st.session_state.retrieval_chain
+        
+        if "eval_chain" not in st.session_state:
+            eval_chain = eval_chain_init()
+            st.session_state.eval_chain = eval_chain
+        else:
+            eval_chain = st.session_state.eval_chain                 
 
         # Question input and response display
         st.header("❓ 开始询问与文档相关的问题")
@@ -61,13 +66,12 @@ def app():
         # Initialize chat history
         if "messages" not in st.session_state:
             st.session_state.messages = [{"role": "assistant", "content": "你好,有什么我可以帮你的吗？"}]
+            st.session_state.greeting = True
 
-         
-        # Display chat messages from history on app rerun
+        # For each message in session state
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
-                
         last_message = st.session_state.messages[-1]
         
         if last_message["role"] == "assistant":
@@ -84,7 +88,31 @@ def app():
                     with st.chat_message("assistant"):
                         st.markdown(response['answer'])
                     st.session_state.messages.append({"role": "assistant", "content": response['answer']})
-                                    
+                    
+            # Show the evaluation button
+            
+            if st.session_state.greeting:
+                st.session_state.greeting = False
+            else:    
+                if st.button("评价"):
+                    st.session_state.show_eval = True
+                
+            if st.session_state.get("show_eval", False):
+                with st.form(key="eval_form"):
+                    evaluate_input = st.text_area("请输入预期回答:")
+                    submitted = st.form_submit_button("提交评价")
+                    if submitted:
+                        # Get the final bot's reponse
+                        ai_response = st.session_state.messages[-1]["content"]
+                        with st.spinner("评价中..."):
+                            score = eval_chain.invoke(input={
+                                "ai_response": remove_think_chain(ai_response),
+                                "human_response": evaluate_input
+                            })
+                            st.success(f"评分结果: {score}")
+                        # Reset the evaluation button state
+                        st.session_state.show_eval = False
+                                
     else:
         st.info("请先上传文件")
     
